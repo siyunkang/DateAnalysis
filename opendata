@@ -1,0 +1,70 @@
+import requests
+import xml.etree.ElementTree as ET
+import pandas as pd # 데이터를 구조화하기 위해 pandas 라이브러리 사용 (선택 사항)
+
+# API 정보
+API_KEY = '644277536473696535327442716a68'
+BASE_URL = 'http://openapi.seoul.go.kr:8088'
+
+# 요청할 데이터의 시작/종료 행 번호, 연도, 월 설정
+START_INDEX = 1
+END_INDEX = 5
+YEAR = 2018
+MONTH = '01'
+
+# 최종 URL 조합
+URL = f"{BASE_URL}/{API_KEY}/xml/energyUseDataStatInfo/{START_INDEX}/{END_INDEX}/{YEAR}/{MONTH}"
+
+def get_seoul_energy_data(url):
+    """
+    서울시 에너지 사용량 API를 호출하고 XML 데이터를 파싱하여 리스트를 반환합니다.
+    """
+    try:
+        # 1. API 요청
+        response = requests.get(url)
+        response.raise_for_status() # HTTP 오류 발생 시 예외를 발생시킵니다.
+        
+        # 2. XML 파싱
+        # requests.text는 문자열이므로, ET.fromstring()을 사용하여 XML Element 객체로 변환합니다.
+        root = ET.fromstring(response.text)
+        
+        # 3. 데이터 추출
+        data_list = []
+        
+        # <row> 태그를 모두 찾습니다.
+        for row in root.findall('row'):
+            host_code = row.find('HOSTCODE').text if row.find('HOSTCODE') is not None else ''
+            dong_code = row.find('DONGCODE').text if row.find('DONGCODE') is not None else ''
+            gas_usage = row.find('GUS').text if row.find('GUS') is not None else ''
+            now_co2 = row.find('NOW_CO2').text if row.find('NOW_CO2') is not None else ''
+
+            data_list.append({
+                '구': host_code,
+                '동': dong_code,
+                '가스사용량(GUS)': gas_usage,
+                '현재CO2배출량(NOW_CO2)': now_co2
+            })
+            
+        return data_list
+
+    except requests.exceptions.RequestException as e:
+        print(f"API 요청 중 오류가 발생했습니다: {e}")
+        return []
+    except ET.ParseError as e:
+        print(f"XML 파싱 중 오류가 발생했습니다: {e}")
+        return []
+
+# 함수 실행 및 결과 저장
+energy_data = get_seoul_energy_data(URL)
+
+# 결과 출력
+print(f"요청 URL: {URL}\n")
+
+if energy_data:
+    # Pandas DataFrame으로 변환하여 깔끔하게 출력 (선택 사항)
+    df = pd.DataFrame(energy_data)
+    print("--- 추출된 데이터 (DataFrame) ---")
+    print(df)
+else:
+    print("데이터를 가져오는 데 실패했거나 데이터가 없습니다.")
+
